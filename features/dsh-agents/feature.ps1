@@ -59,10 +59,10 @@ function Start-Bridge {
   if ($null -eq $node) { return }
   $bridge = Join-Path $script:FeatureDir 'bridge.js'
   if (-not (Test-Path -LiteralPath $bridge)) { return }
-  $previous = $env:DSH_OVERLAY_DIR
-  $env:DSH_OVERLAY_DIR = $script:Dir
+  $previous = $env:CHIPDECK_DIR
+  $env:CHIPDECK_DIR = $script:Dir
   try { Start-Process -FilePath $node.Source -ArgumentList @($bridge) -WorkingDirectory $script:FeatureDir -WindowStyle Hidden } catch { }
-  finally { $env:DSH_OVERLAY_DIR = $previous }
+  finally { $env:CHIPDECK_DIR = $previous }
 }
 
 function Get-State {

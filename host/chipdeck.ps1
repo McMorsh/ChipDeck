@@ -4,7 +4,7 @@
 
     A frameless always-on-top window with a strip of features and a system-tray
     menu. The host knows nothing about DSH or zapret: it discovers every
-    directory under ../features (or $env:DSH_OVERLAY_FEATURES) that has a
+    directory under ../features (or $env:CHIPDECK_FEATURES) that has a
     feature.json, renders it by kind, watches that directory for edits, keeps a
     user-defined chip order, and lets features contribute tray entries.
 
@@ -24,8 +24,8 @@ Add-Type -AssemblyName System.Drawing
 $ErrorActionPreference = 'Stop'
 $script:HostDir = Split-Path -Parent $PSCommandPath
 $script:ProjectDir = Split-Path -Parent $script:HostDir
-$script:FeaturesRoot = if ($env:DSH_OVERLAY_FEATURES) { $env:DSH_OVERLAY_FEATURES } else { Join-Path $script:ProjectDir 'features' }
-$script:RuntimeRoot = if ($env:DSH_OVERLAY_DIR) { $env:DSH_OVERLAY_DIR } else { Join-Path $env:LOCALAPPDATA 'dsh-overlay' }
+$script:FeaturesRoot = if ($env:CHIPDECK_FEATURES) { $env:CHIPDECK_FEATURES } else { Join-Path $script:ProjectDir 'features' }
+$script:RuntimeRoot = if ($env:CHIPDECK_DIR) { $env:CHIPDECK_DIR } else { Join-Path $env:LOCALAPPDATA 'dsh-overlay' }
 New-Item -ItemType Directory -Path $script:RuntimeRoot -Force | Out-Null
 
 $script:BoundsPath = Join-Path $script:RuntimeRoot 'window.json'
@@ -33,7 +33,7 @@ $script:FocusPath = Join-Path $script:RuntimeRoot 'focus.flag'
 $script:OrderPath = Join-Path $script:RuntimeRoot 'order.json'
 $script:SettingsPath = Join-Path $script:RuntimeRoot 'settings.json'
 
-$mutexSuffix = if ($env:DSH_OVERLAY_MUTEX_SUFFIX) { '.' + $env:DSH_OVERLAY_MUTEX_SUFFIX } else { '' }
+$mutexSuffix = if ($env:CHIPDECK_MUTEX_SUFFIX) { '.' + $env:CHIPDECK_MUTEX_SUFFIX } else { '' }
 $script:Mutex = New-Object System.Threading.Mutex($false, ('Local\DshOverlayHost' + $mutexSuffix))
 if (-not $script:Mutex.WaitOne(0)) { exit 0 }
 
@@ -77,7 +77,7 @@ function Restore-Bounds {
       $height = [Math]::Max(240, [Math]::Min([double]$saved.height, 1200))
       $left = [Math]::Max($virtualLeft, [Math]::Min([double]$saved.left, $virtualRight - 160))
       $top = [Math]::Max($virtualTop, [Math]::Min([double]$saved.top, $virtualBottom - 120))
-      if ($saved.feature -and -not $env:DSH_OVERLAY_FEATURE) { $script:PreferredFeature = [string]$saved.feature }
+      if ($saved.feature -and -not $env:CHIPDECK_FEATURE) { $script:PreferredFeature = [string]$saved.feature }
     } catch { }
   }
   $script:Window.WindowStartupLocation = 'Manual'
@@ -279,7 +279,7 @@ $script:CloseButton = $script:Window.FindName('CloseButton')
 $script:Scroller = $script:Window.FindName('Scroller')
 $script:FeatureStrip = $script:Window.FindName('FeatureStrip')
 
-$script:PreferredFeature = $env:DSH_OVERLAY_FEATURE
+$script:PreferredFeature = $env:CHIPDECK_FEATURE
 Restore-Bounds
 
 $script:Dirty = $false
@@ -299,7 +299,7 @@ $script:DragId = ''
 $script:DragStartX = 0
 $script:DragMoved = $false
 $script:LastReloadCheck = [datetime]::MinValue
-$script:AutoExitAt = if ($env:DSH_OVERLAY_TEST_EXIT_MS) { (Get-Date).AddMilliseconds([double]$env:DSH_OVERLAY_TEST_EXIT_MS) } else { $null }
+$script:AutoExitAt = if ($env:CHIPDECK_TEST_EXIT_MS) { (Get-Date).AddMilliseconds([double]$env:CHIPDECK_TEST_EXIT_MS) } else { $null }
 
 $script:AllFeatures = Read-Features
 $script:Features = Sort-Features (Get-EffectiveFeatures $script:AllFeatures)
@@ -713,7 +713,7 @@ function Get-FeatureImage($feature) {
 }
 
 function Start-ChipDrag($sender, $eventArgs) {
-  if ($env:DSH_OVERLAY_DEBUG) { Add-HostLog ('debug: chip down ' + [string]$sender.Tag) }
+  if ($env:CHIPDECK_DEBUG) { Add-HostLog ('debug: chip down ' + [string]$sender.Tag) }
   $script:DragId = [string]$sender.Tag
   $script:DragStartX = $eventArgs.GetPosition($script:FeatureStrip).X
   $script:DragMoved = $false
@@ -806,7 +806,7 @@ function Rebuild-Strip {
   foreach ($id in @($script:Order)) {
     if (-not $known.ContainsKey($id)) { $script:Order.Remove($id); continue }
     $chip = New-FeatureChip $known[$id]
-    if ($env:DSH_OVERLAY_DEBUG) { Add-HostLog ('debug: chip ' + $id + ' type=' + $chip.GetType().FullName + ' count=' + @($chip).Count) }
+    if ($env:CHIPDECK_DEBUG) { Add-HostLog ('debug: chip ' + $id + ' type=' + $chip.GetType().FullName + ' count=' + @($chip).Count) }
     $script:FeatureStrip.Children.Add($chip) | Out-Null
     $script:Chips[$id] = $chip
   }
@@ -1012,7 +1012,7 @@ function Toggle-Overlay {
 
 # ---------------------------------------------------------------- switch and reload
 function Switch-Feature([string]$id, [bool]$force) {
-  if ($env:DSH_OVERLAY_DEBUG) { Add-HostLog ('debug: switch ' + $id + ' force=' + $force) }
+  if ($env:CHIPDECK_DEBUG) { Add-HostLog ('debug: switch ' + $id + ' force=' + $force) }
   if ($script:ActiveFeatureId -eq $id -and -not $force) { return }
   if (-not ($script:Features | Where-Object { $_.Id -eq $id })) { return }
   $script:ActiveFeatureId = $id
@@ -1076,7 +1076,7 @@ Rebuild-Strip
 
 # strip drag: capture lives on the strip, so rebuilding chips mid-drag keeps events flowing
 function Complete-ChipDrag($sender, $eventArgs) {
-  if ($env:DSH_OVERLAY_DEBUG) { Add-HostLog ('debug: strip up dragId=[' + $script:DragId + '] moved=' + $script:DragMoved) }
+  if ($env:CHIPDECK_DEBUG) { Add-HostLog ('debug: strip up dragId=[' + $script:DragId + '] moved=' + $script:DragMoved) }
   if ($script:DragId -eq '') { return }
   $id = $script:DragId
   $moved = $script:DragMoved
@@ -1100,7 +1100,7 @@ function Update-ChipDrag([double]$pointerX) {
       if ($null -eq $chip) { continue }
       $origin = $chip.TransformToAncestor($script:FeatureStrip).Transform((New-Object System.Windows.Point -ArgumentList @(0, 0)))
       $center = $origin.X + ([double]$chip.ActualWidth / 2)
-      if ($env:DSH_OVERLAY_DEBUG) { Add-HostLog ('debug: drag i=' + $i + ' center=' + [Math]::Round($center, 1)) }
+      if ($env:CHIPDECK_DEBUG) { Add-HostLog ('debug: drag i=' + $i + ' center=' + [Math]::Round($center, 1)) }
       if ($pointerX -lt $center) { $target = $i; break }
     }
     if ($target -ne $current) {
@@ -1118,7 +1118,7 @@ function Update-ChipDrag([double]$pointerX) {
 
 $script:FeatureStrip.Add_MouseMove({
   param($sender, $eventArgs)
-  if ($env:DSH_OVERLAY_DEBUG) { Add-HostLog ('debug: move dragId=[' + $script:DragId + '] order=' + $script:Order.GetType().Name + ' chips=' + $script:Chips.GetType().Name) }
+  if ($env:CHIPDECK_DEBUG) { Add-HostLog ('debug: move dragId=[' + $script:DragId + '] order=' + $script:Order.GetType().Name + ' chips=' + $script:Chips.GetType().Name) }
   if ($eventArgs -is [System.Windows.Input.MouseEventArgs]) {
     Update-ChipDrag $eventArgs.GetPosition($script:FeatureStrip).X
   }
@@ -1257,7 +1257,7 @@ $script:App.Add_DispatcherUnhandledException({
 })
 
 $script:App.ShutdownMode = 'OnMainWindowClose'
-if ($env:DSH_OVERLAY_SELFTEST) {
+if ($env:CHIPDECK_SELFTEST) {
   $script:SelfTest = New-Object System.Windows.Threading.DispatcherTimer
   $script:SelfTest.Interval = [TimeSpan]::FromSeconds(2)
   $script:SelfTest.Add_Tick({
@@ -1267,7 +1267,7 @@ if ($env:DSH_OVERLAY_SELFTEST) {
       $first = $script:Features | Select-Object -First 1
       if ($null -ne $first) { Switch-Feature $first.Id $true }
       Add-HostLog 'selftest: switched through all features'
-      if ($env:DSH_OVERLAY_SELFTEST_CLICK) {
+      if ($env:CHIPDECK_SELFTEST_CLICK) {
         $target = $script:Features | Select-Object -Skip 1 -First 1
         if ($null -eq $target) { $target = $script:Features | Select-Object -First 1 }
         if ($null -ne $target) {
@@ -1275,7 +1275,7 @@ if ($env:DSH_OVERLAY_SELFTEST) {
           $script:DragMoved = $false
           Complete-ChipDrag $script:FeatureStrip $null
           Add-HostLog ('selftest: click path -> ' + $script:ActiveFeatureId)
-          if ($env:DSH_OVERLAY_SELFTEST_DRAG) {
+          if ($env:CHIPDECK_SELFTEST_DRAG) {
             $script:DragId = $target.Id
             $script:DragStartX = 10000
             $script:DragMoved = $false
@@ -1288,7 +1288,7 @@ if ($env:DSH_OVERLAY_SELFTEST) {
             $script:DragId = ''
             Add-HostLog ('selftest: drag order -> ' + (Get-Content $script:OrderPath -Raw))
           }
-          if ($env:DSH_OVERLAY_SELFTEST_SETTINGS) {
+          if ($env:CHIPDECK_SELFTEST_SETTINGS) {
             Show-Settings
             Add-HostLog 'selftest: settings window opened'
           }

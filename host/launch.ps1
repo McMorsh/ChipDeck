@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $PSCommandPath
 $hostScript = Join-Path $here 'chipdeck.ps1'
 
-if ($Feature -ne '') { $env:DSH_OVERLAY_FEATURE = $Feature }
+if ($Feature -ne '') { $env:CHIPDECK_FEATURE = $Feature }
 
 Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
   -ArgumentList @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $hostScript) `

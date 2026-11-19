@@ -15,9 +15,9 @@ const http = require('node:http')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const PORT = Number(process.env.DSH_OVERLAY_PORT ?? 5199)
+const PORT = Number(process.env.CHIPDECK_PORT ?? 5199)
 const HOST = '127.0.0.1'
-const DIR = process.env.DSH_OVERLAY_DIR ?? path.join(process.env.LOCALAPPDATA ?? process.env.TEMP, 'dsh-overlay')
+const DIR = process.env.CHIPDECK_DIR ?? path.join(process.env.LOCALAPPDATA ?? process.env.TEMP, 'dsh-overlay')
 const STATE = path.join(DIR, 'state.json')
 const COMMANDS = path.join(DIR, 'commands.json')
 const FOCUS = path.join(DIR, 'focus.flag')
