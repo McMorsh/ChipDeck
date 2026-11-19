@@ -142,3 +142,7 @@ Uninstall with `uninstall.cmd`; it also removes the PATH entry. Add
 ## Docs
 
 - [docs/FEATURES.md](docs/FEATURES.md) — the feature contract, host API, examples.
+
+## License
+
+MIT - see [LICENSE](LICENSE).
