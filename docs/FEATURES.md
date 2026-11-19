@@ -59,11 +59,11 @@ Generic: controls one Windows service.
 
 ```json
 {
-  "id": "zapret",
-  "title": "Zapret",
+  "id": "service-example",
+  "title": "Служба",
   "order": 20,
   "kind": "service",
-  "service": "zapret",
+  "service": "MyService",
   "autostart": true,
   "openFolder": true,
   "icon": "icon.png"
@@ -72,8 +72,8 @@ Generic: controls one Windows service.
 
 `service` is the exact service name; `autostart` shows the start-type toggle
 (needs UAC); `openFolder` derives the directory from the service `ImagePath`.
-Start/stop need the interactive-user grant from
-`features/zapret/grant-service-control.ps1`.
+Start/stop may need a per-service grant; `features/zapret/grant-service-control.ps1`
+shows one for the zapret service.
 
 ## `kind: "commands"`
 
@@ -172,6 +172,25 @@ function Enter-Feature { param($Api) $script:Api = $Api; & $Api.Clear; Render }
 function Update-Feature { param($Api) }
 function Dispose-Feature { param($Api) }
 ```
+
+## The `zapret` feature
+
+A script feature, so it works even when the Windows service is not installed
+yet. It finds the distribution in this order: the path saved in
+`RuntimeDir\zapret-path.txt`, the service `ImagePath`, then `zapret*`
+directories in `C:\`, `D:\`, Downloads, Desktop, Documents, the profile root
+and `%LOCALAPPDATA%\Programs`. A candidate survives only if it contains
+`bin\winws.exe` or `winws.exe`; the optional `service` field of `feature.json`
+names the service (default `zapret`).
+
+The view reports one of four states: service running, service stopped, no
+service but a bare `winws.exe` process, or nothing found. Buttons depend on the
+state: start/stop/restart and the autostart toggle need the service; **Установить
+службу…** runs the distribution's `service.bat` elevated so the user picks a
+strategy (`Install Service` in its menu); **Указать папку zapret…** overrides
+discovery through a folder picker and persists the choice. A bare `winws.exe`
+started by `general.bat` is visible but not controllable — without a service
+there is nothing for the overlay to start or stop.
 
 ## The `dsh-agents` feature
 

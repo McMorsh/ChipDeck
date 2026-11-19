@@ -12,7 +12,7 @@ ChipDeck/
     chipdeck.cmd       double-clickable launcher
   features/
     dsh-agents/        DSH chats and approvals (script feature + local bridge)
-    zapret/            one Windows service: status, start/stop, autostart (service feature)
+    zapret/            finds zapret on disk: service or bare winws.exe, start/stop, install
     clock/             example command feature, disabled by default
   docs/
     FEATURES.md        feature contract and examples
@@ -58,7 +58,7 @@ editing a descriptor does not fight the settings page.
 | Feature | Kind | What it does |
 |---|---|---|
 | `dsh-agents` | script | Running DSH sessions and pending approvals with allow/reject; a local bridge carries state from the DSH page; adds an "Открыть DSH" tray entry. |
-| `zapret` | service | Status of the `zapret` service, start/stop/restart, autostart toggle, open its folder, folder tray entry. |
+| `zapret` | script | Finds the zapret folder and the `zapret` service, shows a bare `winws.exe` too, start/stop/restart, autostart toggle, install-service prompt, open folder, tray entries. |
 | `clock` | commands | Example: a status command with a timer and two action buttons (disabled). |
 
 Chips show each feature's `icon` (PNG) or a `glyph` fallback. Drag a chip to
@@ -72,12 +72,23 @@ The bridge runs on `127.0.0.1:5199`, in the feature's runtime directory. If an
 older overlay instance still owns that port, the footer says so — exit the old
 instance and reopen.
 
+`zapret` looks for the distribution itself: the path saved in its runtime
+directory, the service `ImagePath`, then `zapret*` folders in `C:\`, `D:\`,
+Downloads, Desktop, Documents, the profile root and `%LOCALAPPDATA%\Programs`.
+A folder counts only if it contains `bin\winws.exe`. When the service is not
+installed the feature says so and offers **Установить службу…**, which runs the
+distribution's own `service.bat` elevated — pick `Install Service` and a
+strategy there. A zapret started by `general.bat` runs as a bare `winws.exe`:
+the chip shows it, but start/stop belongs to the service, so install the
+service to control it from the overlay.
+
 ## Requirements
 
 - Windows with Windows PowerShell 5.1 (WPF and WinForms are used).
 - Node.js for the `dsh-agents` bridge (it starts lazily).
-- Starting and stopping services needs the one-time grant in
-  `features/zapret/grant-service-control.ps1`.
+- Starting and stopping the zapret service from the overlay is easiest after
+  the one-time grant in `features/zapret/grant-service-control.ps1` (elevated,
+  once). Without it each start/stop asks for elevation.
 
 ## Runtime files
 

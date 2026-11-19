@@ -2,15 +2,8 @@
   "id": "zapret",
   "title": "Zapret",
   "order": 20,
-  "kind": "service",
+  "kind": "script",
+  "entry": "feature.ps1",
   "service": "zapret",
-  "autostart": true,
-  "openFolder": true,
-  "icon": "icon.png",
-  "tray": [
-    {
-      "label": "Открыть папку zapret",
-      "command": "$img = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\zapret').ImagePath; $exe = ($img -split ' ')[0]; Start-Process (Split-Path -Parent (Split-Path -Parent $exe))"
-    }
-  ]
+  "icon": "icon.png"
 }
