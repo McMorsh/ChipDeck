@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Stop'
 $script:HostDir = Split-Path -Parent $PSCommandPath
 $script:ProjectDir = Split-Path -Parent $script:HostDir
 $script:FeaturesRoot = if ($env:CHIPDECK_FEATURES) { $env:CHIPDECK_FEATURES } else { Join-Path $script:ProjectDir 'features' }
-$script:RuntimeRoot = if ($env:CHIPDECK_DIR) { $env:CHIPDECK_DIR } else { Join-Path $env:LOCALAPPDATA 'dsh-overlay' }
+$script:RuntimeRoot = if ($env:CHIPDECK_DIR) { $env:CHIPDECK_DIR } else { Join-Path $env:LOCALAPPDATA 'chipdeck' }
 New-Item -ItemType Directory -Path $script:RuntimeRoot -Force | Out-Null
 
 $script:BoundsPath = Join-Path $script:RuntimeRoot 'window.json'
@@ -34,7 +34,7 @@ $script:OrderPath = Join-Path $script:RuntimeRoot 'order.json'
 $script:SettingsPath = Join-Path $script:RuntimeRoot 'settings.json'
 
 $mutexSuffix = if ($env:CHIPDECK_MUTEX_SUFFIX) { '.' + $env:CHIPDECK_MUTEX_SUFFIX } else { '' }
-$script:Mutex = New-Object System.Threading.Mutex($false, ('Local\DshOverlayHost' + $mutexSuffix))
+$script:Mutex = New-Object System.Threading.Mutex($false, ('Local\ChipDeckHost' + $mutexSuffix))
 if (-not $script:Mutex.WaitOne(0)) { exit 0 }
 
 # ---------------------------------------------------------------- helpers
