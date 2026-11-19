@@ -1,0 +1,8 @@
+{
+  "id": "dsh-agents",
+  "title": "Агенты",
+  "order": 10,
+  "kind": "script",
+  "entry": "feature.ps1",
+  "icon": "icon.png"
+}

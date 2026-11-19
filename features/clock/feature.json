@@ -1,0 +1,26 @@
+{
+  "id": "clock",
+  "title": "Часы",
+  "order": 30,
+  "kind": "commands",
+  "enabled": false,
+  "icon": "icon.png",
+  "status": "Get-Date -Format 'dd.MM.yyyy HH:mm:ss'",
+  "refreshSeconds": 5,
+  "actions": [
+    {
+      "label": "Открыть папку загрузок",
+      "command": "Start-Process $env:USERPROFILE\\Downloads"
+    },
+    {
+      "label": "Свободно на диске C:",
+      "command": "Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}} | Format-List | Out-String"
+    }
+  ],
+  "tray": [
+    {
+      "label": "Открыть загрузки",
+      "command": "Start-Process $env:USERPROFILE\\Downloads"
+    }
+  ]
+}
