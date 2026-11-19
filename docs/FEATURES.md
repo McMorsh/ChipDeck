@@ -1,4 +1,4 @@
-# Overlay features
+# ChipDeck features
 
 A feature is a directory under `features/` with a `feature.json`. The host
 discovers them at startup, sorts them by the saved chip order (then `order`,
@@ -23,7 +23,7 @@ feature reloads it in the running host — no restart.
 
 The tray gear opens a settings page with one checkbox per feature, an opacity
 slider (30–100 %) and a “topmost” switch. It is backed by
-`%LOCALAPPDATA%\dsh-overlay\settings.json`:
+`%LOCALAPPDATA%\chipdeck\settings.json`:
 
 ```json
 { "opacity": 0.9, "topmost": true, "enabled": { "clock": true } }
@@ -36,7 +36,7 @@ rewritten whenever a setting changes.
 ## Chip order
 
 Drag a chip along the strip to reorder features. The order is saved to
-`%LOCALAPPDATA%\dsh-overlay\order.json` (a plain array of ids) and survives
+`%LOCALAPPDATA%\chipdeck\order.json` (a plain array of ids) and survives
 restarts; features added later are appended after the saved ones unless their
 `order` places them differently. A click without dragging selects the feature.
 
@@ -189,12 +189,12 @@ The matching DSH client plugin lives in `plugins/agent-overlay` and pushes
 
 | Variable | Effect |
 |---|---|
-| `DSH_OVERLAY_FEATURES` | Use another features root. |
-| `DSH_OVERLAY_FEATURE` | Initial feature id (`dsh-overlay <id>` sets it). |
-| `DSH_OVERLAY_DIR` | Another runtime root (order, bounds, feature runtimes). |
-| `DSH_OVERLAY_MUTEX_SUFFIX` | Separate single-instance mutex for a test copy. |
-| `DSH_OVERLAY_TEST_EXIT_MS` | Close the window after N ms. |
-| `DSH_OVERLAY_SELFTEST` | Switch through every feature once, then log the result. |
-| `DSH_OVERLAY_SELFTEST_CLICK` | Also run the chip-click path programmatically. |
-| `DSH_OVERLAY_SELFTEST_DRAG` | Also reorder a chip and persist `order.json`. |
-| `DSH_OVERLAY_DEBUG` | Log click/drag/switch events to `host-errors.log`. |
+| `CHIPDECK_FEATURES` | Use another features root. |
+| `CHIPDECK_FEATURE` | Initial feature id (`chipdeck <id>` sets it). |
+| `CHIPDECK_DIR` | Another runtime root (order, bounds, feature runtimes). |
+| `CHIPDECK_MUTEX_SUFFIX` | Separate single-instance mutex for a test copy. |
+| `CHIPDECK_TEST_EXIT_MS` | Close the window after N ms. |
+| `CHIPDECK_SELFTEST` | Switch through every feature once, then log the result. |
+| `CHIPDECK_SELFTEST_CLICK` | Also run the chip-click path programmatically. |
+| `CHIPDECK_SELFTEST_DRAG` | Also reorder a chip and persist `order.json`. |
+| `CHIPDECK_DEBUG` | Log click/drag/switch events to `host-errors.log`. |

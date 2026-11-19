@@ -1,15 +1,15 @@
-# dsh-overlay
+# ChipDeck
 
 An always-on-top overlay for Windows with a tool strip and a system-tray menu.
 The project is split into a **host** and **features**:
 
 ```
-dsh-overlay/
+ChipDeck/
   host/
-    overlay.ps1        window, tool strip, tray, feature loader, generic renderers
+    chipdeck.ps1       window, tool strip, tray, feature loader, generic renderers
     settings.ps1       preferences, feature toggles and the settings window
     launch.ps1         starts the host hidden
-    overlay.cmd        double-clickable launcher
+    chipdeck.cmd       double-clickable launcher
   features/
     dsh-agents/        DSH chats and approvals (script feature + local bridge)
     zapret/            one Windows service: status, start/stop, autostart (service feature)
@@ -25,8 +25,8 @@ The host knows nothing about DSH or zapret. It discovers every directory under
 ## Use
 
 ```bat
-dsh-overlay            :: last used feature
-dsh-overlay zapret     :: open on a specific feature
+chipdeck               :: last used feature
+chipdeck zapret        :: open on a specific feature
 ```
 
 The window is frameless, always-on-top, drag it by the header, resize it from
@@ -47,7 +47,7 @@ The gear item in the tray (**⚙ Настройки…**) opens a settings page:
 - **Opacity** — 30–100 %, applied to the overlay immediately;
 - **Поверх всех окон** — keep the window above other applications.
 
-Preferences live in `%LOCALAPPDATA%\dsh-overlay\settings.json`. Per-feature
+Preferences live in `%LOCALAPPDATA%\chipdeck\settings.json`. Per-feature
 overrides from this page take precedence over `enabled` in `feature.json`, so
 editing a descriptor does not fight the settings page.
 ## Features
@@ -78,8 +78,8 @@ instance and reopen.
 
 ## Runtime files
 
-`%LOCALAPPDATA%\dsh-overlay` holds `window.json`, `focus.flag`, `host-errors.log`,
-and one subdirectory per feature. `DSH_OVERLAY_DIR` moves the root.
+`%LOCALAPPDATA%\chipdeck` holds `window.json`, `focus.flag`, `host-errors.log`,
+and one subdirectory per feature. `CHIPDECK_DIR` moves the root.
 
 ## Docs
 
