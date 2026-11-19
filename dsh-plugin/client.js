@@ -23,7 +23,7 @@ window.__ModuleLoader__.load({
     const PILL_CLASS = 'dshao-pill'
 
     const CSS = `
-.dshao-pill{position:fixed;right:16px;bottom:16px;z-index:70;display:inline-flex;align-items:center;gap:8px;
+.dshao-pill{position:fixed;left:16px;bottom:88px;z-index:70;display:inline-flex;align-items:center;gap:8px;
   padding:7px 12px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);
   background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);
   font:600 12px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.22);
@@ -37,7 +37,7 @@ window.__ModuleLoader__.load({
   justify-content:center;font-size:11px;font-variant-numeric:tabular-nums;
   background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}
 .dshao-badge[data-tone="warn"]{background:var(--dsw-alias-state-warn-primary);color:#1b1500}
-.dshao-panel{position:fixed;right:16px;bottom:64px;z-index:70;width:340px;max-height:62vh;overflow:auto;
+.dshao-panel{position:fixed;left:16px;bottom:136px;z-index:70;width:340px;max-height:62vh;overflow:auto;
   border-radius:14px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-overlay);
   box-shadow:0 18px 48px rgba(0,0,0,.28);pointer-events:auto}
 .dshao-root{display:flex;flex-direction:column;height:100%;box-sizing:border-box;
@@ -147,6 +147,31 @@ window.__ModuleLoader__.load({
             tool: typeof row.waiting.toolName === 'string' ? row.waiting.toolName : '',
             reason: reasonOf(row.waiting, 'en'),
             answerable: row.waiting.answerable !== false,
+            // A question carries the option batch the native panel may answer;
+            // approvals carry no questions and stay on the allow/reject path.
+            questions: Array.isArray(row.waiting.questions)
+              ? row.waiting.questions.map(question => ({
+                  id: String(question.id),
+                  question: String(question.question ?? ''),
+                  header: typeof question.header === 'string' ? question.header : '',
+                  detail: typeof question.detail === 'string' ? question.detail : '',
+                  multiSelect: question.multiSelect === true,
+                  options: Array.isArray(question.options)
+                    ? question.options.map(option => ({
+                        label: String(option.label),
+                        description: typeof option.description === 'string' ? option.description : '',
+                      }))
+                    : [],
+                  intent: question.intent === undefined || question.intent === null
+                    ? null
+                    : {
+                        kind: String(question.intent.kind ?? ''),
+                        approve: typeof question.intent.approve === 'string' ? question.intent.approve : '',
+                        reject: typeof question.intent.reject === 'string' ? question.intent.reject : '',
+                        always: typeof question.intent.always === 'string' ? question.intent.always : '',
+                      },
+                }))
+              : [],
           })),
       }
     }
@@ -155,11 +180,25 @@ window.__ModuleLoader__.load({
     function interactionByKey(api, key) {
       const uiSession = api.get('uiSession')
       const pending = snapshotOf(uiSession === undefined ? undefined : uiSession.pendingInteractions)
-      if (pending === undefined || pending === null || typeof pending.forEach !== 'function') return undefined
       let found
-      pending.forEach((interaction) => {
-        if (String(interaction.key ?? '') === key) found = interaction
-      })
+      if (pending !== undefined && pending !== null && typeof pending.forEach === 'function') {
+        pending.forEach((interaction) => {
+          if (String(interaction.key ?? '') === key) found = interaction
+        })
+        if (found !== undefined) return found
+      }
+      // The pending map is filled by the mounted card; a blocking question can
+      // sit only in the per-session status, so search that projection too.
+      const sessionsService = api.get('sessions')
+      const list = snapshotOf(sessionsService === undefined ? undefined : sessionsService.list)
+      const status = snapshotOf(uiSession === undefined ? undefined : uiSession.sessionStatus)
+      if (list === undefined || status === undefined || typeof status.get !== 'function') return undefined
+      const ids = Array.isArray(list.ids) ? list.ids : Object.keys((list && list.byId) || {})
+      for (const id of ids) {
+        const state = status.get(id)
+        const candidate = state === undefined || state === null ? undefined : state.pendingInteraction
+        if (candidate !== undefined && candidate !== null && String(candidate.key ?? '') === key) return candidate
+      }
       return found
     }
 
@@ -173,7 +212,17 @@ window.__ModuleLoader__.load({
         if (command === null || typeof command !== 'object') continue
         if (command.type === 'answer' && typeof command.key === 'string' && (command.decision === 'allowed-once' || command.decision === 'rejected')) {
           const interaction = interactionByKey(api, command.key)
-          if (interaction !== undefined && interaction.answerable !== false) api.answer(interaction, command.decision)
+          // Only approvals accept 'allowed-once'/'rejected'; a question takes a
+          // structured answer batch from the separate command below.
+          if (interaction !== undefined && interaction.kind === 'approval' && interaction.answerable !== false) api.answer(interaction, command.decision)
+        } else if (command.type === 'answer-question' && typeof command.key === 'string' && Array.isArray(command.answers)) {
+          const interaction = interactionByKey(api, command.key)
+          if (interaction !== undefined && typeof interaction.answer === 'function' && interaction.kind !== 'approval') {
+            try {
+              const result = interaction.answer({ answers: command.answers })
+              if (result !== undefined && result !== null && typeof result.catch === 'function') result.catch(() => {})
+            } catch { /* the request settled between render and click */ }
+          }
         } else if (command.type === 'open' && typeof command.sessionId === 'string') {
           api.open(command.sessionId)
         }

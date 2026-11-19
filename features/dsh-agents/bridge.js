@@ -87,7 +87,10 @@ function takeCommands() {
   try { fs.unlinkSync(COMMANDS) } catch { /* the window may rewrite it */ }
   try {
     const parsed = JSON.parse(text)
-    return Array.isArray(parsed) ? parsed : []
+    if (Array.isArray(parsed)) return parsed
+    // Tolerate a wrapper object an older serializer may have produced.
+    if (parsed !== null && typeof parsed === 'object' && Array.isArray(parsed.value)) return parsed.value
+    return []
   } catch {
     return []
   }

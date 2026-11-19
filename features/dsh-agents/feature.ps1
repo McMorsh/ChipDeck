@@ -33,12 +33,22 @@ function Write-JsonFile([string]$path, [string]$text) {
 }
 
 function Add-PageCommand([hashtable]$command) {
-  $list = @()
+  $list = New-Object System.Collections.Generic.List[object]
   if (Test-Path -LiteralPath $script:CommandsPath) {
-    try { $list = @([System.IO.File]::ReadAllText($script:CommandsPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json) } catch { $list = @() }
+    try {
+      $parsed = ConvertFrom-Json -InputObject ([System.IO.File]::ReadAllText($script:CommandsPath, [System.Text.Encoding]::UTF8))
+      if ($null -ne $parsed) {
+        $items = @($parsed)
+        # Unwrap a wrapper object a previous serialization may have produced.
+        if ($items.Count -eq 1 -and $null -ne $items[0] -and $null -ne $items[0].PSObject.Properties['value'] -and $null -ne $items[0].PSObject.Properties['Count']) {
+          $items = @($items[0].value)
+        }
+        foreach ($item in $items) { if ($null -ne $item) { [void]$list.Add($item) } }
+      }
+    } catch { }
   }
-  $list += [pscustomobject]$command
-  Write-JsonFile $script:CommandsPath (ConvertTo-Json -InputObject @($list) -Depth 5 -Compress)
+  [void]$list.Add([pscustomobject]$command)
+  Write-JsonFile $script:CommandsPath (ConvertTo-Json -InputObject @($list.ToArray()) -Depth 6 -Compress)
 }
 
 function Test-Bridge {
@@ -112,21 +122,72 @@ function Render {
   }
 
   if ($waiting.Count -gt 0) {
-    $api.Panel.Children.Add((& $api.NewSection 'ТРЕБУЮТ ПОДТВЕРЖДЕНИЯ')) | Out-Null
+    $api.Panel.Children.Add((& $api.NewSection 'ТРЕБУЮТ ВНИМАНИЯ')) | Out-Null
     foreach ($item in $waiting) {
+      $kind = [string]$item.kind
+      $sessionId = [string]$item.sessionId
       $meta = 'Инструмент: {0}' -f $item.tool
       if ($null -ne $item.reason -and $item.reason -ne '') { $meta = $meta + "`n" + $item.reason }
-      $key = [string]$item.key
-      $answerable = [bool]$item.answerable
-      $allow = & $api.NewButton 'AllowButton' 'Разрешить' {
-        Add-PageCommand @{ type = 'answer'; key = $key; decision = 'allowed-once' }
-      }.GetNewClosure()
-      $reject = & $api.NewButton 'RejectButton' 'Отклонить' {
-        Add-PageCommand @{ type = 'answer'; key = $key; decision = 'rejected' }
-      }.GetNewClosure()
-      $allow.IsEnabled = $answerable
-      $reject.IsEnabled = $answerable
-      $api.Panel.Children.Add((& $api.NewRow 'warn' ([string]$item.title) $meta @($allow, $reject))) | Out-Null
+      if ($kind -eq 'approval' -or $kind -eq '') {
+        $key = [string]$item.key
+        $answerable = [bool]$item.answerable
+        $allow = & $api.NewButton 'AllowButton' 'Разрешить' {
+          Add-PageCommand @{ type = 'answer'; key = $key; decision = 'allowed-once' }
+        }.GetNewClosure()
+        $reject = & $api.NewButton 'RejectButton' 'Отклонить' {
+          Add-PageCommand @{ type = 'answer'; key = $key; decision = 'rejected' }
+        }.GetNewClosure()
+        $allow.IsEnabled = $answerable
+        $reject.IsEnabled = $answerable
+        $api.Panel.Children.Add((& $api.NewRow 'warn' ([string]$item.title) $meta @($allow, $reject))) | Out-Null
+      } else {
+        # Questions carry their own options: answer them in place when the batch
+        # is a single choice, otherwise send the user to DSH.
+        $questions = @($item.questions)
+        $question = if ($questions.Count -eq 1 -and -not [bool]$questions[0].multiSelect) { $questions[0] } else { $null }
+        $key = [string]$item.key
+        $replies = @()
+        if ($null -ne $question) {
+          $meta = [string]$question.question
+          if ([string]$question.detail -ne '') { $meta = $meta + "`n" + [string]$question.detail }
+          $intent = $question.intent
+          $options = @($question.options)
+          if ($null -ne $intent -and [string]$intent.kind -eq 'approval' -and [string]$intent.approve -ne '') {
+            $replies += @{ Text = 'Разрешить'; Selected = @([string]$intent.approve) }
+            if ([string]$intent.reject -ne '') { $replies += @{ Text = 'Отклонить'; Selected = @([string]$intent.reject) } }
+            if ([string]$intent.always -ne '') { $replies += @{ Text = 'Разрешать всегда'; Selected = @([string]$intent.always) } }
+          } elseif ($null -ne $intent -and [string]$intent.kind -eq 'plan-review' -and [string]$intent.approve -ne '') {
+            $replies += @{ Text = 'Принять план'; Selected = @([string]$intent.approve) }
+            foreach ($option in $options) {
+              if ([string]$option.label -ne [string]$intent.approve) {
+                $replies += @{ Text = 'Отклонить'; Selected = @([string]$option.label) }
+                break
+              }
+            }
+          } elseif ($options.Count -ge 1 -and $options.Count -le 3) {
+            foreach ($option in $options) { $replies += @{ Text = [string]$option.label; Selected = @([string]$option.label) } }
+          }
+        } else {
+          $meta = 'Вопрос агента: ответ даётся в DSH'
+        }
+        $api.Panel.Children.Add((& $api.NewRow 'warn' ([string]$item.title) $meta @())) | Out-Null
+        if ($replies.Count -gt 0) {
+          $questionId = [string]$question.id
+          foreach ($reply in $replies) {
+            $text = [string]$reply.Text
+            $selected = @($reply.Selected)
+            $answer = & $api.NewFullButton 'PillButton' $text {
+              Add-PageCommand @{ type = 'answer-question'; key = $key; answers = @(@{ id = $questionId; selected = $selected }) }
+            }.GetNewClosure()
+            $api.Panel.Children.Add($answer) | Out-Null
+          }
+        } else {
+          $open = & $api.NewFullButton 'PillButton' 'Открыть в DSH' {
+            Add-PageCommand @{ type = 'open'; sessionId = $sessionId }
+          }.GetNewClosure()
+          $api.Panel.Children.Add($open) | Out-Null
+        }
+      }
     }
   }
 
@@ -153,6 +214,12 @@ function Initialize-Feature {
   param($Api)
   $script:Api = $Api
   Start-Bridge
+  # A reload disposes the previous bridge asynchronously: give the port a moment
+  # and retry once so the feature never ends up without a bridge.
+  if ($null -eq (Test-Bridge)) {
+    Start-Sleep -Milliseconds 900
+    Start-Bridge
+  }
   $script:BridgeChecked = $true
   & $Api.AddTrayItem 'Открыть DSH' { Start-Process (Get-Origin) }
 }
@@ -186,4 +253,9 @@ function Update-Feature {
 function Dispose-Feature {
   param($Api)
   try { Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:5199/shutdown' -TimeoutSec 1 | Out-Null } catch { }
+  # Wait for the port to free so a reload can start the next bridge immediately.
+  for ($i = 0; $i -lt 25; $i++) {
+    Start-Sleep -Milliseconds 100
+    if ($null -eq (Test-Bridge)) { break }
+  }
 }
