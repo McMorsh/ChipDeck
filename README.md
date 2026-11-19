@@ -84,6 +84,39 @@ instance and reopen.
 `%LOCALAPPDATA%\chipdeck` holds `window.json`, `focus.flag`, `host-errors.log`,
 and one subdirectory per feature. `CHIPDECK_DIR` moves the root.
 
+## Quick start (from the repository)
+
+```bat
+git clone https://github.com/McMorsh/ChipDeck.git chipdeck
+cd chipdeck
+setup.cmd
+```
+
+The first run detects the DSH profile, asks whether to enable the **DSH agents**
+feature, links `dsh-plugin` into that profile (junction, no pnpm), stores the
+choice in `settings.json` and starts the overlay. Restart DSH afterwards so it
+loads the plugin.
+
+Flags: `-WithDsh`, `-WithoutDsh` (skip DSH entirely), `-NoLaunch`, `-NoPause`,
+`-Install` (copy to `%LOCALAPPDATA%\Programs\ChipDeck` with shortcuts).
+Without a DSH profile the overlay still works; the agents feature stays off.
+
+## Install
+
+Run `install.cmd` (or `install.ps1`) from this folder. It copies ChipDeck to
+`%LOCALAPPDATA%\Programs\ChipDeck`, creates Start Menu and startup shortcuts,
+and when DSH is present installs the bundled `dsh-plugin` into the DSH profile
+and adds `@local/dsh-agent-overlay` to `dsh.profile.bundles`.
+
+Close DSH before running the installer: the running DSH holds the profile lock
+and pnpm cannot update it.
+
+Options: `-InstallDir <path>`, `-NoAutostart`, `-SkipDsh`, `-NoLaunch`,
+`-DshDryRun` (print the DSH command without running it), `-DshCommand <path>`.
+
+Uninstall with `uninstall.cmd`; add `-RemoveDshPlugin` to disable the plugin in
+DSH and `-RemoveSettings` to delete `%LOCALAPPDATA%\chipdeck`.
+
 ## Docs
 
 - [docs/FEATURES.md](docs/FEATURES.md) — the feature contract, host API, examples.
