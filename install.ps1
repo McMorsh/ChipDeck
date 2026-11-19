@@ -11,6 +11,7 @@
         .\install.ps1 -NoAutostart
         .\install.ps1 -InstallDir D:\Apps\ChipDeck
         .\install.ps1 -SkipDsh
+        .\install.ps1 -NoPath
         .\install.ps1 -DshDryRun -NoLaunch
 #>
 
@@ -20,6 +21,7 @@ param(
     [switch]$NoAutostart,
     [switch]$SkipDsh,
     [switch]$NoLaunch,
+    [switch]$NoPath,
     [switch]$DshDryRun
 )
 
@@ -65,6 +67,70 @@ function New-Shortcut([string]$path, [string]$arguments, [string]$workDir) {
         Write-Warn ('Could not create shortcut ' + $path + ': ' + $_.Exception.Message)
         return $false
     }
+}
+
+# ---- user PATH: make `chipdeck` callable from a new console
+# Appends <InstallDir>\host to HKCU\Environment Path (no admin needed) and
+# notifies running shells through WM_SETTINGCHANGE. Existing consoles keep the
+# old PATH until reopened.
+
+function Get-NormalizedPathEntry([string]$value) {
+    if ([string]::IsNullOrWhiteSpace($value)) { return '' }
+    $expanded = [Environment]::ExpandEnvironmentVariables($value)
+    try { $expanded = [System.IO.Path]::GetFullPath($expanded) } catch { }
+    return $expanded.Trim().TrimEnd('\').ToLowerInvariant()
+}
+
+function Get-UserPathRaw {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+    if ($null -eq $key) { return '' }
+    try {
+        return [string]$key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    } finally { $key.Close() }
+}
+
+function Update-EnvironmentBroadcast {
+    try {
+        if (-not ('ChipDeck.EnvBroadcast' -as [type])) {
+            Add-Type -Namespace ChipDeck -Name EnvBroadcast -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public static extern System.IntPtr SendMessageTimeout(System.IntPtr hWnd, uint Msg, System.UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out System.IntPtr lpdwResult);
+'@
+        }
+        $result = [System.IntPtr]::Zero
+        [void][ChipDeck.EnvBroadcast]::SendMessageTimeout([System.IntPtr]0xFFFF, 0x001A, [System.UIntPtr]::Zero, 'Environment', 0x0002, 5000, [ref]$result)
+    } catch { }
+}
+
+function Test-UserPathEntry([string]$entry) {
+    $normalized = Get-NormalizedPathEntry $entry
+    if ($normalized -eq '') { return $false }
+    foreach ($part in @((Get-UserPathRaw) -split ';')) {
+        if ((Get-NormalizedPathEntry $part) -eq $normalized) { return $true }
+    }
+    return $false
+}
+
+function Add-UserPathEntry([string]$entry) {
+    $normalized = Get-NormalizedPathEntry $entry
+    if ($normalized -eq '') { return $false }
+    $current = Get-UserPathRaw
+    $parts = @($current -split ';' | Where-Object { $_.Trim() -ne '' })
+    foreach ($part in $parts) {
+        if ((Get-NormalizedPathEntry $part) -eq $normalized) { return $false }
+    }
+    $next = (@($parts) + $entry) -join ';'
+    try {
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+        if ($null -eq $key) { throw 'HKCU\Environment is not writable' }
+        try { $key.SetValue('Path', $next, [Microsoft.Win32.RegistryValueKind]::ExpandString) }
+        finally { $key.Close() }
+    } catch {
+        Write-Warn ('Could not update the user PATH: ' + $_.Exception.Message)
+        return $false
+    }
+    Update-EnvironmentBroadcast
+    return $true
 }
 
 function Find-DshCommand {
@@ -206,6 +272,33 @@ if (-not (Test-Path -LiteralPath $launchScript)) {
     throw ('Not found: ' + $launchScript)
 }
 
+$binDir = Join-Path $InstallDir 'bin'
+$pathEntry = $binDir
+$pathReady = $false
+if ($NoPath) {
+    Write-Log 'User PATH left unchanged (-NoPath).'
+} else {
+    New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+    $shim = Join-Path $binDir 'chipdeck.cmd'
+    $shimText = @'
+@echo off
+rem ChipDeck launcher; the installer puts this folder on the user PATH.
+start "" powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0..\host\launch.ps1" %*
+exit /b 0
+'@
+    [System.IO.File]::WriteAllText($shim, ($shimText -replace "`r?`n", "`r`n"), (New-Object System.Text.ASCIIEncoding))
+    $pathReady = Test-UserPathEntry $pathEntry
+    if ($pathReady) {
+        Write-Log ('User PATH already contains ' + $pathEntry)
+    } elseif (Add-UserPathEntry $pathEntry) {
+        $pathReady = $true
+        Write-Log ('Added to the user PATH: ' + $pathEntry)
+        Write-Log 'Open a new console window to run "chipdeck" there.'
+    } else {
+        Write-Log ('Run "chipdeck.cmd" from ' + $binDir + ' or add that folder to PATH manually.')
+    }
+}
+
 $startMenuDir = [Environment]::GetFolderPath('Programs')
 New-Shortcut (Join-Path $startMenuDir 'ChipDeck.lnk') ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $launchScript + '"') (Split-Path -Parent $launchScript)
 
@@ -230,6 +323,7 @@ if (-not $SkipDsh) {
 }
 
 Write-Log ('Done. Launch: ' + $launchScript)
+if ($pathReady) { Write-Log 'Console: run "chipdeck" (or "chipdeck zapret") in a new window.' }
 if (-not $NoLaunch) {
     Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @(
         '-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', $launchScript

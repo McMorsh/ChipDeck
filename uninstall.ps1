@@ -32,6 +32,56 @@ function Stop-ChipDeck {
     }
 }
 
+function Get-NormalizedPathEntry([string]$value) {
+    if ([string]::IsNullOrWhiteSpace($value)) { return '' }
+    $expanded = [Environment]::ExpandEnvironmentVariables($value)
+    try { $expanded = [System.IO.Path]::GetFullPath($expanded) } catch { }
+    return $expanded.Trim().TrimEnd('\').ToLowerInvariant()
+}
+
+function Get-UserPathRaw {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+    if ($null -eq $key) { return '' }
+    try {
+        return [string]$key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    } finally { $key.Close() }
+}
+
+function Update-EnvironmentBroadcast {
+    try {
+        if (-not ('ChipDeck.EnvBroadcast' -as [type])) {
+            Add-Type -Namespace ChipDeck -Name EnvBroadcast -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public static extern System.IntPtr SendMessageTimeout(System.IntPtr hWnd, uint Msg, System.UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out System.IntPtr lpdwResult);
+'@
+        }
+        $result = [System.IntPtr]::Zero
+        [void][ChipDeck.EnvBroadcast]::SendMessageTimeout([System.IntPtr]0xFFFF, 0x001A, [System.UIntPtr]::Zero, 'Environment', 0x0002, 5000, [ref]$result)
+    } catch { }
+}
+
+function Remove-UserPathEntry([string]$entry) {
+    $normalized = Get-NormalizedPathEntry $entry
+    if ($normalized -eq '') { return $false }
+    $current = Get-UserPathRaw
+    if ($current -eq '') { return $false }
+    $parts = @($current -split ';' | Where-Object { $_.Trim() -ne '' })
+    $kept = @($parts | Where-Object { (Get-NormalizedPathEntry $_) -ne $normalized })
+    if ($kept.Count -eq $parts.Count) { return $false }
+    $next = $kept -join ';'
+    try {
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+        if ($null -eq $key) { throw 'HKCU\Environment is not writable' }
+        try { $key.SetValue('Path', $next, [Microsoft.Win32.RegistryValueKind]::ExpandString) }
+        finally { $key.Close() }
+    } catch {
+        Write-Log ('WARNING: could not update the user PATH: ' + $_.Exception.Message)
+        return $false
+    }
+    Update-EnvironmentBroadcast
+    return $true
+}
+
 function Find-DshCommand {
     $command = Get-Command dsh -ErrorAction SilentlyContinue
     if ($null -ne $command) { return $command.Source }
@@ -76,6 +126,12 @@ Write-Log '=== ChipDeck uninstaller ==='
 $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 
 Stop-ChipDeck
+
+foreach ($pathEntry in @((Join-Path $InstallDir 'bin'), (Join-Path $InstallDir 'host'))) {
+    if (Remove-UserPathEntry $pathEntry) {
+        Write-Log ('Removed from the user PATH: ' + $pathEntry + ' (new consoles no longer have "chipdeck")')
+    }
+}
 
 foreach ($shortcut in @(
     (Join-Path ([Environment]::GetFolderPath('Programs')) 'ChipDeck.lnk'),

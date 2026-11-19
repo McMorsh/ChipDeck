@@ -29,6 +29,10 @@ chipdeck               :: last used feature
 chipdeck zapret        :: open on a specific feature
 ```
 
+After `install.cmd` the command works in any new console: the installer puts a
+`chipdeck.cmd` shim into `<InstallDir>\bin` and appends that folder to the user
+PATH. In the repository, before installing, run `host\chipdeck.cmd`.
+
 The window is frameless, always-on-top, drag it by the header, resize it from
 the edges. Its ✕ hides it to the tray; the tray icon brings it back on a double
 click (Windows 11 keeps new icons in the overflow «^» — pin it to the taskbar).
@@ -119,14 +123,21 @@ Run `install.cmd` (or `install.ps1`) from this folder. It copies ChipDeck to
 and when DSH is present installs the bundled `dsh-plugin` into the DSH profile
 and adds `@local/dsh-agent-overlay` to `dsh.profile.bundles`.
 
+It also writes `<InstallDir>\bin\chipdeck.cmd` and appends that folder to the
+current user's PATH (HKCU, no admin needed), so a new console can run
+`chipdeck` / `chipdeck zapret` from anywhere. Already open windows keep the old
+PATH until reopened. `-NoPath` skips the shim and the PATH change.
+
 Close DSH before running the installer: the running DSH holds the profile lock
 and pnpm cannot update it.
 
 Options: `-InstallDir <path>`, `-NoAutostart`, `-SkipDsh`, `-NoLaunch`,
-`-DshDryRun` (print the DSH command without running it), `-DshCommand <path>`.
+`-NoPath`, `-DshDryRun` (print the DSH command without running it),
+`-DshCommand <path>`.
 
-Uninstall with `uninstall.cmd`; add `-RemoveDshPlugin` to disable the plugin in
-DSH and `-RemoveSettings` to delete `%LOCALAPPDATA%\chipdeck`.
+Uninstall with `uninstall.cmd`; it also removes the PATH entry. Add
+`-RemoveDshPlugin` to disable the plugin in DSH and `-RemoveSettings` to delete
+`%LOCALAPPDATA%\chipdeck`.
 
 ## Docs
 
