@@ -1,0 +1,3 @@
+- insert:
+    - id: agent-overlay
+      name: '@local/dsh-agent-overlay'

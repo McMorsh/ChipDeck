@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Agent overlay">
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="#1f6feb"/>
+  <rect x="10" y="12" width="44" height="40" rx="9" fill="#0d1b33" opacity="0.55"/>
+  <circle cx="19" cy="24" r="4" fill="#7ee2a8"/>
+  <rect x="27" y="21" width="20" height="6" rx="3" fill="#dbe7ff"/>
+  <circle cx="19" cy="38" r="4" fill="#ffd166"/>
+  <rect x="27" y="35" width="14" height="6" rx="3" fill="#dbe7ff" opacity="0.75"/>
+  <path d="M40 38l4 4 7-9" fill="none" stroke="#7ee2a8" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

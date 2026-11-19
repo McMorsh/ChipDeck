@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Agent overlay",
+    "description": "Always-on-top panel with the chats that are running now and the agent actions waiting for your decision.",
+    "detail": "docs/DETAIL.md"
+  }
+}
