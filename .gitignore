@@ -1,2 +1,20 @@
 # created by install.ps1 when it runs inside the repository (in-place install)
 /bin/
+
+# runtime state, if CHIPDECK_DIR points at the repository
+/window.json
+/focus.flag
+/order.json
+/settings.json
+
+# logs written next to the scripts (grant-service-control.ps1, host errors)
+*.log
+
+# dependencies and tooling
+node_modules/
+/.runtime/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.tmp
