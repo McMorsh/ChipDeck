@@ -32,6 +32,7 @@ chipdeck zapret        :: open on a specific feature
 The window is frameless, always-on-top, drag it by the header, resize it from
 the edges. Its ✕ hides it to the tray; the tray icon brings it back on a double
 click (Windows 11 keeps new icons in the overflow «^» — pin it to the taskbar).
+The ⚙ next to the ✕ opens the settings page (features, opacity, always-on-top).
 
 The tray menu has: show/hide, the current feature, a **Фичи** submenu, one
 start/stop/restart group per `service` feature, and **Выход** (which also lets
@@ -39,7 +40,8 @@ features clean up — the DSH agents feature stops its bridge).
 
 ## Settings
 
-The gear item in the tray (**⚙ Настройки…**) opens a settings page:
+The gear in the title bar (**⚙**) or the tray item (**⚙ Настройки…**) opens the
+same settings page:
 
 - **Features** — a checkbox per discovered feature; turn any of them on or off
   without editing `feature.json` (the `clock` example is off by default but can
@@ -50,6 +52,7 @@ The gear item in the tray (**⚙ Настройки…**) opens a settings page:
 Preferences live in `%LOCALAPPDATA%\chipdeck\settings.json`. Per-feature
 overrides from this page take precedence over `enabled` in `feature.json`, so
 editing a descriptor does not fight the settings page.
+
 ## Features
 
 | Feature | Kind | What it does |
