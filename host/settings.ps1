@@ -1,7 +1,7 @@
 ﻿# Settings for the overlay host: persisted preferences, the effective feature
 # list and the settings window behind the tray gear.
 #
-# Dot-sourced into overlay.ps1 at script scope, so `$script:` here is the
+# Dot-sourced into chipdeck.ps1 at script scope, so `$script:` here is the
 # host's script scope and every host function is callable.
 
 $script:Settings = $null
