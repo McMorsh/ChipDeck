@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 <#
-    Overlay host.
+    ChipDeck host.
 
     A frameless always-on-top window with a strip of features and a system-tray
     menu. The host knows nothing about DSH or zapret: it discovers every
@@ -155,7 +155,7 @@ function Get-FeaturesSignature {
 $script:Xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Overlay" Width="380" Height="540" MinWidth="320" MinHeight="240"
+        Title="ChipDeck" Width="380" Height="540" MinWidth="320" MinHeight="240"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display"
@@ -252,7 +252,7 @@ $script:Xaml = @'
         </Grid.ColumnDefinitions>
         <Ellipse x:Name="HeaderDot" Grid.Column="0" Width="8" Height="8" Fill="#62D69B" VerticalAlignment="Center" Margin="0,0,9,0"/>
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-          <TextBlock Style="{StaticResource BaseText}" FontSize="12.5" FontWeight="SemiBold" Text="Оверлей"/>
+          <TextBlock Style="{StaticResource BaseText}" FontSize="12.5" FontWeight="SemiBold" Text="ChipDeck"/>
           <TextBlock x:Name="Summary" Style="{StaticResource MutedText}" Text=""/>
         </StackPanel>
         <Button x:Name="CloseButton" Grid.Column="2" Style="{StaticResource CloseButton}" Content="✕" ToolTip="Свернуть в трей"/>
@@ -874,7 +874,7 @@ function Rebuild-TrayMenu {
   if ($script:MenuOpen) { $script:TrayDirty = $true; return }
   $script:TrayDirty = $false
   $script:Menu.Items.Clear()
-  $script:ShowItem = New-MenuItem 'Показать оверлей' { Toggle-Overlay } $false
+  $script:ShowItem = New-MenuItem 'Показать ChipDeck' { Toggle-Overlay } $false
   $script:ActiveItem = New-MenuItem 'Фича: —' $null $false
   $script:ActiveItem.Enabled = $false
   $script:Menu.Items.Add($script:ShowItem) | Out-Null
@@ -951,7 +951,7 @@ function Rebuild-TrayMenu {
 
 function Update-TrayMenuState {
   if ($null -eq $script:ShowItem) { return }
-  $script:ShowItem.Text = $(if ($script:Window.IsVisible) { 'Скрыть оверлей' } else { 'Показать оверлей' })
+  $script:ShowItem.Text = $(if ($script:Window.IsVisible) { 'Скрыть ChipDeck' } else { 'Показать ChipDeck' })
   $active = Get-ActiveFeature
   if ($null -ne $script:ActiveItem) { $script:ActiveItem.Text = 'Фича: ' + $(if ($null -eq $active) { '—' } else { $active.Title }) }
   foreach ($featureId in $script:ServiceEntries.Keys) {
@@ -1002,7 +1002,7 @@ function Hide-Overlay {
   $script:Window.Hide()
   if (-not $script:HideHintShown) {
     $script:HideHintShown = $true
-    Show-Balloon 'Оверлей' 'Свёрнуто в трей. Вернуть — двойным кликом по иконке.'
+    Show-Balloon 'ChipDeck' 'Свёрнуто в трей. Вернуть - двойным кликом по иконке.'
   }
 }
 
@@ -1149,7 +1149,7 @@ $script:TrayHandle = $script:TrayBitmap.GetHicon()
 
 $script:TrayIcon = New-Object System.Windows.Forms.NotifyIcon
 $script:TrayIcon.Icon = [System.Drawing.Icon]::FromHandle($script:TrayHandle)
-$script:TrayIcon.Text = 'Оверлей · фичи и службы'
+$script:TrayIcon.Text = 'ChipDeck · фичи и службы'
 $script:TrayIcon.ContextMenuStrip = $script:Menu
 $script:TrayIcon.Visible = $true
 $script:TrayIcon.Add_DoubleClick({ Toggle-Overlay })
@@ -1252,7 +1252,7 @@ $script:App = New-Object System.Windows.Application
 $script:App.Add_DispatcherUnhandledException({
   param($sender, $eventArgs)
   try { Add-HostLog ('unhandled: ' + $eventArgs.Exception.Message + "`n" + $eventArgs.Exception.StackTrace) } catch { }
-  try { Show-Balloon 'Ошибка оверлея' ([string]$eventArgs.Exception.Message) } catch { }
+  try { Show-Balloon 'Ошибка ChipDeck' ([string]$eventArgs.Exception.Message) } catch { }
   $eventArgs.Handled = $true
 })
 

@@ -1,4 +1,4 @@
-﻿# Settings for the overlay host: persisted preferences, the effective feature
+﻿# Settings for the ChipDeck host: persisted preferences, the effective feature
 # list and the settings window behind the tray gear.
 #
 # Dot-sourced into chipdeck.ps1 at script scope, so `$script:` here is the
@@ -90,7 +90,7 @@ function New-SettingsWindow {
   $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Настройки оверлея" Width="400" SizeToContent="Height"
+        Title="Настройки ChipDeck" Width="400" SizeToContent="Height"
         WindowStyle="ToolWindow" ResizeMode="NoResize" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner" Background="#F5161619"
         FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display">

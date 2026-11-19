@@ -141,12 +141,12 @@ server.on('error', (error) => {
     // Another bridge instance already serves the page; nothing to do.
     process.exit(0)
   }
-  process.stderr.write(`dsh-overlay bridge: ${String(error)}\n`)
+  process.stderr.write(`chipdeck bridge: ${String(error)}\n`)
   process.exit(1)
 })
 
 server.listen(PORT, HOST, () => {
-  process.stdout.write(`dsh-overlay bridge listening on http://${HOST}:${PORT}\n`)
+  process.stdout.write(`chipdeck bridge listening on http://${HOST}:${PORT}\n`)
 })
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

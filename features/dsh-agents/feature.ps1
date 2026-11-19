@@ -77,7 +77,7 @@ function Get-Origin {
 
 function Update-Footer {
   if ($script:BridgeConflict) {
-    & $script:Api.SetFooter 'Мост занят старым оверлеем — выйди из него в трее'
+    & $script:Api.SetFooter 'Мост занят старым экземпляром ChipDeck - выйди из него в трее'
     return
   }
   $fresh = $false
