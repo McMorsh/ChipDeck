@@ -249,13 +249,15 @@ $script:Xaml = @'
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <Ellipse x:Name="HeaderDot" Grid.Column="0" Width="8" Height="8" Fill="#62D69B" VerticalAlignment="Center" Margin="0,0,9,0"/>
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
           <TextBlock Style="{StaticResource BaseText}" FontSize="12.5" FontWeight="SemiBold" Text="ChipDeck"/>
           <TextBlock x:Name="Summary" Style="{StaticResource MutedText}" Text=""/>
         </StackPanel>
-        <Button x:Name="CloseButton" Grid.Column="2" Style="{StaticResource CloseButton}" Content="✕" ToolTip="Свернуть в трей"/>
+        <Button x:Name="SettingsButton" Grid.Column="2" Style="{StaticResource CloseButton}" Content="⚙" FontSize="14" Padding="6,2" Margin="0,0,2,0" ToolTip="Настройки: фичи, прозрачность, поверх окон"/>
+        <Button x:Name="CloseButton" Grid.Column="3" Style="{StaticResource CloseButton}" Content="✕" ToolTip="Свернуть в трей"/>
       </Grid>
       <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="12,0,10,4">
         <StackPanel x:Name="FeatureStrip" Orientation="Horizontal"/>
@@ -276,6 +278,7 @@ $script:Status = $script:Window.FindName('Status')
 $script:ContentHost = $script:Window.FindName('ContentHost')
 $script:HeaderDot = $script:Window.FindName('HeaderDot')
 $script:CloseButton = $script:Window.FindName('CloseButton')
+$script:SettingsButton = $script:Window.FindName('SettingsButton')
 $script:Scroller = $script:Window.FindName('Scroller')
 $script:FeatureStrip = $script:Window.FindName('FeatureStrip')
 
@@ -1162,6 +1165,7 @@ $script:Window.Add_SizeChanged({ $script:Dirty = $true })
 $script:Header.Add_MouseLeftButtonDown({
   try { $script:Window.DragMove() } catch { }
 })
+$script:SettingsButton.Add_Click({ Show-Settings })
 $script:CloseButton.Add_Click({ Hide-Overlay })
 $script:Window.Add_Closing({
   param($sender, $eventArgs)
@@ -1293,6 +1297,11 @@ if ($env:CHIPDECK_SELFTEST) {
             Add-HostLog 'selftest: settings window opened'
           }
         }
+      }
+      if ($env:CHIPDECK_SELFTEST_GEAR) {
+        $clickEvent = [System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent)
+        $script:SettingsButton.RaiseEvent($clickEvent)
+        Add-HostLog ('selftest: gear click -> settings visible=' + $script:SettingsWindow.IsVisible)
       }
     } catch {
       Add-HostLog ('selftest: ' + ($_ | Out-String))
