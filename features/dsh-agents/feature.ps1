@@ -21,6 +21,7 @@ $script:CommandsPath = Join-Path $script:Dir 'commands.json'
 $script:Origin = 'http://127.0.0.1:3080'
 $script:LastStateText = ''
 $script:LastStateTime = [datetime]::MinValue
+$script:LastFresh = $false
 $script:BridgeChecked = $false
 $script:BridgeConflict = $false
 
@@ -85,21 +86,28 @@ function Get-Origin {
   return $script:Origin
 }
 
+function Test-StateFresh {
+  if (-not (Test-Path -LiteralPath $script:StatePath)) { return $false }
+  $age = ((Get-Date) - (Get-Item -LiteralPath $script:StatePath).LastWriteTime).TotalSeconds
+  return ($age -lt 8)
+}
+
 function Update-Footer {
   if ($script:BridgeConflict) {
     & $script:Api.SetFooter 'Мост занят старым экземпляром ChipDeck - выйди из него в трее'
     return
   }
-  $fresh = $false
-  if (Test-Path -LiteralPath $script:StatePath) {
-    $fresh = ((Get-Date) - (Get-Item -LiteralPath $script:StatePath).LastWriteTime).TotalSeconds -lt 8
-  }
+  $fresh = Test-StateFresh
   & $script:Api.SetFooter $(if ($fresh) { 'DSH подключён' } else { 'Нет связи с DSH' })
 }
 
 function Render {
   $api = $script:Api
-  $state = Get-State
+  # A stale file means DSH is not pushing right now: keep the previous zero.
+  $fresh = Test-StateFresh
+  $script:LastFresh = $fresh
+  $state = $null
+  if ($fresh) { $state = Get-State }
   $waiting = @()
   $running = @()
   if ($null -ne $state) {
@@ -114,7 +122,7 @@ function Render {
   if ($waiting.Count -eq 0 -and $running.Count -eq 0) {
     $empty = New-Object System.Windows.Controls.TextBlock
     $empty.Style = & $api.GetResource 'MutedText'
-    $empty.Text = 'Сейчас никто не работает и подтверждать нечего.'
+    $empty.Text = $(if ($fresh) { 'Сейчас никто не работает и подтверждать нечего.' } else { 'Нет связи с DSH. Откройте вкладку DSH, чтобы получить состояние.' })
     $empty.TextAlignment = 'Center'
     $empty.Margin = New-Object System.Windows.Thickness(8, 22, 8, 22)
     $empty.TextWrapping = 'Wrap'
@@ -235,6 +243,9 @@ function Enter-Feature {
 function Update-Feature {
   param($Api)
   if (-not $script:BridgeChecked) { $script:BridgeChecked = $true; Start-Bridge }
+  # Redraw when DSH goes offline or comes back, not only when the file changes.
+  $freshNow = Test-StateFresh
+  if ($freshNow -ne $script:LastFresh) { Render; return }
   if (Test-Path -LiteralPath $script:StatePath) {
     $file = Get-Item -LiteralPath $script:StatePath
     if ($file.LastWriteTime -gt $script:LastStateTime) {
