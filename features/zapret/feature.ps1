@@ -234,6 +234,24 @@ function Install-ZapretService {
   }
 }
 
+function Invoke-ZapretElevated([string]$action) {
+  $payload = switch ($action) {
+    'start' { "Start-Service -Name '$($script:ServiceName)' -ErrorAction Stop" }
+    'stop' { "Stop-Service -Name '$($script:ServiceName)' -Force -ErrorAction Stop" }
+    'restart' { "Stop-Service -Name '$($script:ServiceName)' -Force -ErrorAction Stop; Start-Sleep -Seconds 2; Start-Service -Name '$($script:ServiceName)' -ErrorAction Stop" }
+    default { '' }
+  }
+  if ($payload -eq '') { return $false }
+  $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($payload))
+  $arguments = @('-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded)
+  try {
+    $process = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru -WindowStyle Hidden
+    return ($null -ne $process -and $process.ExitCode -eq 0)
+  } catch {
+    return $false
+  }
+}
+
 function Invoke-ZapretService([string]$action) {
   $label = $(switch ($action) { 'start' { 'запущена' } 'stop' { 'остановлена' } 'restart' { 'перезапущена' } default { $action } })
   if ((Get-ZapretState).ImagePathValid -eq $false) {
@@ -254,19 +272,17 @@ function Invoke-ZapretService([string]$action) {
   }
 
   if (-not $done) {
-    try {
-      $command = $(if ($action -eq 'restart') {
-        'sc stop {0} & sc start {0}' -f $script:ServiceName
-      } else {
-        'sc {0} {1}' -f $action, $script:ServiceName
-      })
-      $process = Start-Process -FilePath "$env:SystemRoot\System32\cmd.exe" -ArgumentList ('/c ' + $command) -Verb RunAs -Wait -PassThru -WindowStyle Hidden
-      if ($process.ExitCode -eq 0) { $done = $true }
-      else { $errorText = 'sc: код ' + $process.ExitCode }
-    } catch {
-      $errorText = $_.Exception.Message
+    $elevated = Invoke-ZapretElevated $action
+    if (-not $elevated) {
+      $errorText = 'нужны права администратора: подтвердите UAC или выдайте права на службу'
     }
   }
+
+  # The helper may return a non-zero code even when the service did change state.
+  $state = Get-ZapretState
+  if ($action -eq 'start' -and $state.Status -eq 'Running') { $done = $true }
+  if ($action -eq 'stop' -and $state.Status -eq 'Stopped') { $done = $true }
+  if ($action -eq 'restart' -and $state.Status -eq 'Running') { $done = $true }
 
   if ($done) { & $script:Api.ShowBalloon 'Zapret' ('Служба ' + $label) }
   else { & $script:Api.ShowBalloon 'Zapret' ('Не удалось: ' + $errorText) }
