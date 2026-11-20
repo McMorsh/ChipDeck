@@ -134,6 +134,7 @@ function Get-ZapretState {
   $status = 'Missing'
   $startType = 'Unknown'
   $strategy = ''
+  $imageOk = $true
   if ($null -ne $service) {
     $status = [string]$service.Status
     $key = 'HKLM:\SYSTEM\CurrentControlSet\Services\' + $script:ServiceName
@@ -149,6 +150,13 @@ function Get-ZapretState {
         default { 'Unknown' }
       })
       $strategy = [string]$properties.'zapret-discord-youtube'
+      # A moved distribution leaves the service pointing at a missing exe.
+      $imageOk = $false
+      $imagePath = [string]$properties.ImagePath
+      if ($imagePath -match '^"([^"]+)"') { $exe = $Matches[1] }
+      elseif ($imagePath -match '^(\S+\.exe)') { $exe = $Matches[1] }
+      else { $exe = '' }
+      if ($exe -ne '' -and (Test-Path -LiteralPath ([System.Environment]::ExpandEnvironmentVariables($exe)))) { $imageOk = $true }
     } catch {
       try { $startType = [string]$service.StartType } catch { }
     }
@@ -169,12 +177,13 @@ function Get-ZapretState {
     ProcessCount = $processCount
     ProcessId = $processId
     Folder = Get-FolderCached $false
+    ImagePathValid = $imageOk
   }
 }
 
 function Get-Signature {
   $state = Get-ZapretState
-  return ('{0}|{1}|{2}|{3}|{4}|{5}' -f $state.Status, $state.StartType, $state.Strategy, $state.Folder, $state.ProcessCount, $state.ProcessId)
+  return ('{0}|{1}|{2}|{3}|{4}|{5}|{6}' -f $state.Status, $state.StartType, $state.Strategy, $state.Folder, $state.ProcessCount, $state.ProcessId, $state.ImagePathValid)
 }
 
 # ---------------------------------------------------------------- actions
@@ -227,6 +236,10 @@ function Install-ZapretService {
 
 function Invoke-ZapretService([string]$action) {
   $label = $(switch ($action) { 'start' { 'запущена' } 'stop' { 'остановлена' } 'restart' { 'перезапущена' } default { $action } })
+  if ((Get-ZapretState).ImagePathValid -eq $false) {
+    & $script:Api.ShowBalloon 'Zapret' 'Служба ссылается на отсутствующий winws.exe - переустановите службу'
+    return
+  }
   $done = $false
   $errorText = ''
   try {
@@ -286,7 +299,11 @@ function Render {
 
   $summary = 'не найден'
   $tone = 'idle'
-  if ($state.Status -eq 'Running') {
+  $brokenPath = ($state.Status -ne 'Missing' -and -not $state.ImagePathValid)
+  if ($brokenPath) {
+    $summary = 'служба ссылается на старую папку'
+    $tone = 'warn'
+  } elseif ($state.Status -eq 'Running') {
     $summary = 'служба работает'
     $tone = 'run'
   } elseif ($state.Status -ne 'Missing') {
@@ -322,11 +339,12 @@ function Render {
   $meta = 'Служба «{0}»: {1}' -f $script:ServiceName, $stateText
   if ($state.Status -eq 'Missing' -and $state.ProcessCount -gt 0) { $meta = $meta + "`n" + ('Процесс winws.exe: PID {0}' -f $state.ProcessId) }
   if ($state.Strategy -ne '') { $meta = $meta + "`n" + ('Стратегия: ' + $state.Strategy) }
+  if ($brokenPath) { $meta = $meta + "`n" + 'winws.exe по пути службы не найден: переустановите службу' }
 
   $toggle = & $api.NewButton 'AllowButton' $(if ($state.Status -eq 'Running') { 'Остановить' } else { 'Запустить' }) {
     if ((Get-ZapretState).Status -eq 'Running') { Invoke-ZapretService 'stop' } else { Invoke-ZapretService 'start' }
   }.GetNewClosure()
-  $toggle.IsEnabled = ($state.Status -ne 'Missing')
+  $toggle.IsEnabled = ($state.Status -ne 'Missing' -and -not $brokenPath)
   $restart = & $api.NewButton 'GhostButton' 'Перезапустить' { Invoke-ZapretService 'restart' }.GetNewClosure()
   $restart.IsEnabled = ($state.Status -eq 'Running')
   $api.Panel.Children.Add((& $api.NewRow $tone 'Zapret' $meta @($toggle, $restart))) | Out-Null
@@ -336,16 +354,17 @@ function Render {
     $api.Panel.Children.Add($open) | Out-Null
   }
 
-  if ($state.Status -ne 'Missing') {
+  if ($state.Status -eq 'Missing' -or $brokenPath) {
+    $installLabel = $(if ($brokenPath) { '⚙ Переустановить службу…' } else { '⚙ Установить службу…' })
+    $install = & $api.NewFullButton 'PillButton' $installLabel { Install-ZapretService }.GetNewClosure()
+    $install.IsEnabled = ($null -ne $folder)
+    $api.Panel.Children.Add($install) | Out-Null
+  } else {
     $autoLabel = $(if ($state.StartType -eq 'Automatic') { '⏻ Автозапуск включён' } else { '⏻ Автозапуск выключен' })
     $auto = & $api.NewFullButton 'PillButton' $autoLabel {
       Set-ZapretAutostart ((Get-ZapretState).StartType -ne 'Automatic')
     }.GetNewClosure()
     $api.Panel.Children.Add($auto) | Out-Null
-  } else {
-    $install = & $api.NewFullButton 'PillButton' '⚙ Установить службу…' { Install-ZapretService }.GetNewClosure()
-    $install.IsEnabled = ($null -ne $folder)
-    $api.Panel.Children.Add($install) | Out-Null
   }
 
   $pick = & $api.NewFullButton 'GhostButton' '📁 Указать папку zapret…' { Select-ZapretFolder }.GetNewClosure()
@@ -368,7 +387,8 @@ function Render {
   $api.Panel.Children.Add((& $api.NewSection 'ZAPRET')) | Out-Null
   $api.Panel.Children.Add($details) | Out-Null
 
-  if ($state.Status -eq 'Running') { & $api.SetFooter 'Служба работает - обход активен' }
+  if ($brokenPath) { & $api.SetFooter 'Служба ссылается на старую папку - нажмите «Переустановить службу…»' }
+  elseif ($state.Status -eq 'Running') { & $api.SetFooter 'Служба работает - обход активен' }
   elseif ($state.Status -ne 'Missing') { & $api.SetFooter 'Служба остановлена - «Запустить» вернёт обход' }
   elseif ($state.ProcessCount -gt 0) { & $api.SetFooter 'winws.exe запущен вручную, службы нет: чип видит только процесс' }
   elseif ($null -ne $folder) { & $api.SetFooter 'Службы нет: «Установить службу…» запустит service.bat' }
