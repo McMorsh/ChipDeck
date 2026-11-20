@@ -502,7 +502,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['slots', 'locale', 'sessions', 'uiSession', 'uiSession.sessionStatus'],
+      inject: ['slots', 'locale', 'sessions', 'uiSession'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, {
           en: {
