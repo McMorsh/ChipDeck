@@ -28,6 +28,7 @@ $script:Folder = $null
 $script:LastScan = [datetime]::MinValue
 $script:LastPoll = [datetime]::MinValue
 $script:LastRender = ''
+$script:PingLines = @()
 
 New-Item -ItemType Directory -Path $script:Dir -Force | Out-Null
 
@@ -308,6 +309,63 @@ function Set-ZapretAutostart([bool]$enable) {
 
 # ---------------------------------------------------------------- view
 
+function Invoke-ZapretPing {
+  $command = @'
+$r = @()
+foreach ($h in @('1.1.1.1', '8.8.8.8')) {
+  $p = @(Test-Connection -ComputerName $h -Count 3 -ErrorAction SilentlyContinue)
+  if ($p.Count -gt 0) {
+    $a = [math]::Round((($p | Measure-Object ResponseTime -Average).Average), 0)
+    $r += ($h + '=' + $a)
+  } else {
+    $r += ($h + '=нет')
+  }
+}
+foreach ($t in @(@('discord.com', 443), @('youtube.com', 443), @('top.gg', 443))) {
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
+  try {
+    $c = New-Object System.Net.Sockets.TcpClient
+    $c.Connect($t[0], $t[1])
+    $c.Close()
+    $r += ('{0}={1}' -f $t[0], $sw.ElapsedMilliseconds)
+  } catch {
+    $r += ('{0}=нет' -f $t[0])
+  }
+}
+$r -join ';'
+'@
+  $text = [string](& $script:Api.RunCommand $command 25)
+  $labels = @{
+    '1.1.1.1' = 'cloudflare'
+    '8.8.8.8' = 'google'
+    'discord.com' = 'discord'
+    'youtube.com' = 'youtube'
+    'top.gg' = 'top.gg'
+  }
+  $icmp = @()
+  $tcp = @()
+  foreach ($part in ($text -split ';')) {
+    $pair = $part.Trim() -split '=', 2
+    if ($pair.Count -ne 2) { continue }
+    $name = $pair[0]
+    $value = $pair[1]
+    if (-not $labels.ContainsKey($name)) { continue }
+    $label = $labels[$name]
+    if ($value -eq 'нет') { $line = $label + ' нет' }
+    else { $line = $label + ' ' + $value + ' мс' }
+    if ($name -eq '1.1.1.1' -or $name -eq '8.8.8.8') { $icmp += $line } else { $tcp += $line }
+  }
+  if ($icmp.Count -eq 0 -and $tcp.Count -eq 0) {
+    $script:PingLines = @('пинг: не удалось измерить')
+  } else {
+    $script:PingLines = @('пинг: ' + ($icmp -join ' · '))
+    if ($tcp.Count -gt 0) { $script:PingLines += ('      ' + ($tcp -join ' · ')) }
+  }
+  & $script:Api.ShowBalloon 'Zapret' $script:PingLines[0]
+  $script:LastRender = ''
+  Render
+}
+
 function Render {
   $api = $script:Api
   $state = Get-ZapretState
@@ -370,6 +428,9 @@ function Render {
     $api.Panel.Children.Add($open) | Out-Null
   }
 
+  $ping = & $api.NewFullButton 'GhostButton' '📶 Проверить пинг' { Invoke-ZapretPing }.GetNewClosure()
+  $api.Panel.Children.Add($ping) | Out-Null
+
   if ($state.Status -eq 'Missing' -or $brokenPath) {
     $installLabel = $(if ($brokenPath) { '⚙ Переустановить службу…' } else { '⚙ Установить службу…' })
     $install = & $api.NewFullButton 'PillButton' $installLabel { Install-ZapretService }.GetNewClosure()
@@ -395,6 +456,7 @@ function Render {
     ('стратегия: ' + $(if ($state.Strategy -ne '') { $state.Strategy } else { '—' })),
     ('папка: ' + $(if ($null -ne $folder) { $folder } else { 'не найдена' }))
   )
+  foreach ($line in $script:PingLines) { $lines += $line }
   if ($state.Status -eq 'Missing') {
     $lines += ('winws.exe: ' + $(if ($state.ProcessCount -gt 0) { 'PID ' + $state.ProcessId } else { 'не запущен' }))
   }
