@@ -7,10 +7,9 @@
  * a decision, with Allow / Reject buttons that answer the pending approval
  * directly.
  *
- * Data comes from the shipped Client services: `sessions.list` (identity and
- * display title), `uiSession.sessionStatus` (running flag and the effective
- * pending interaction) and `uiSession.pendingInteractions` (the answerable
- * PendingApproval instances). No Host half is needed.
+ * Data comes from the shipped Client services: `sessions.list` (identity,
+ * display title and host running flag) and `uiSession.pendingInteractions`
+ * (the answerable PendingApproval instances). No Host half is needed.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-agent-overlay',
@@ -127,7 +126,6 @@ window.__ModuleLoader__.load({
       const uiSession = api.get('uiSession')
       const rows = rowsOf(
         snapshotOf(sessionsService === undefined ? undefined : sessionsService.list),
-        snapshotOf(uiSession === undefined ? undefined : uiSession.sessionStatus),
         snapshotOf(uiSession === undefined ? undefined : uiSession.pendingInteractions),
       )
       return {
@@ -185,19 +183,6 @@ window.__ModuleLoader__.load({
         pending.forEach((interaction) => {
           if (String(interaction.key ?? '') === key) found = interaction
         })
-        if (found !== undefined) return found
-      }
-      // The pending map is filled by the mounted card; a blocking question can
-      // sit only in the per-session status, so search that projection too.
-      const sessionsService = api.get('sessions')
-      const list = snapshotOf(sessionsService === undefined ? undefined : sessionsService.list)
-      const status = snapshotOf(uiSession === undefined ? undefined : uiSession.sessionStatus)
-      if (list === undefined || status === undefined || typeof status.get !== 'function') return undefined
-      const ids = Array.isArray(list.ids) ? list.ids : Object.keys((list && list.byId) || {})
-      for (const id of ids) {
-        const state = status.get(id)
-        const candidate = state === undefined || state === null ? undefined : state.pendingInteraction
-        if (candidate !== undefined && candidate !== null && String(candidate.key ?? '') === key) return candidate
       }
       return found
     }
@@ -266,7 +251,6 @@ window.__ModuleLoader__.load({
       const uiSession = api.get('uiSession')
       const watched = [
         sessionsService === undefined ? undefined : sessionsService.list,
-        uiSession === undefined ? undefined : uiSession.sessionStatus,
         uiSession === undefined ? undefined : uiSession.pendingInteractions,
       ].filter(observable => observable !== undefined && observable !== null && typeof observable.subscribe === 'function')
       const unsubscribes = watched.map(observable => observable.subscribe(() => {
@@ -312,8 +296,8 @@ window.__ModuleLoader__.load({
       return typeof interaction.reason === 'string' ? interaction.reason : ''
     }
 
-    /** Model rows: pending decisions first, then running chats. */
-    function rowsOf(list, status, pending) {
+    /** Model rows: pending decisions first, then chats the host reports running. */
+    function rowsOf(list, pending) {
       const byId = list !== undefined && list !== null && typeof list.byId === 'object' ? list.byId : {}
       const ids = list !== undefined && list !== null && Array.isArray(list.ids) ? list.ids : Object.keys(byId)
       const rows = []
@@ -322,9 +306,8 @@ window.__ModuleLoader__.load({
         if (seen.has(id)) return
         seen.add(id)
         const summary = byId[id]
-        const state = status !== undefined && status !== null && typeof status.get === 'function' ? status.get(id) : undefined
-        const waiting = interaction ?? (state === undefined ? undefined : state.pendingInteraction)
-        const running = (state === undefined ? undefined : state.running) ?? (summary === undefined ? false : summary.running) ?? false
+        const waiting = interaction
+        const running = summary !== undefined && summary !== null && summary.running === true
         if (waiting === undefined && !running) return
         rows.push({
           id,
@@ -345,11 +328,10 @@ window.__ModuleLoader__.load({
       const sessionsService = api.get('sessions')
       const uiSession = api.get('uiSession')
       const list = useSnapshot(sessionsService === undefined ? undefined : sessionsService.list)
-      const status = useSnapshot(uiSession === undefined ? undefined : uiSession.sessionStatus)
       const pending = useSnapshot(uiSession === undefined ? undefined : uiSession.pendingInteractions)
       const localeSnapshot = useSnapshot(api.locale)
       const activeLocale = localeSnapshot !== undefined && typeof localeSnapshot.active === 'string' ? localeSnapshot.active : 'en'
-      const rows = React.useMemo(() => rowsOf(list, status, pending), [list, status, pending])
+      const rows = React.useMemo(() => rowsOf(list, pending), [list, pending])
       const waitingRows = rows.filter(row => row.waiting !== undefined && row.waiting !== null)
       const runningRows = rows.filter(row => row.waiting === undefined || row.waiting === null)
       const renderRow = (row) => {
@@ -446,9 +428,8 @@ window.__ModuleLoader__.load({
       const sessionsService = api.get('sessions')
       const uiSession = api.get('uiSession')
       const list = useSnapshot(sessionsService === undefined ? undefined : sessionsService.list)
-      const status = useSnapshot(uiSession === undefined ? undefined : uiSession.sessionStatus)
       const pending = useSnapshot(uiSession === undefined ? undefined : uiSession.pendingInteractions)
-      const rows = React.useMemo(() => rowsOf(list, status, pending), [list, status, pending])
+      const rows = React.useMemo(() => rowsOf(list, pending), [list, pending])
       const waiting = rows.filter(row => row.waiting !== undefined && row.waiting !== null).length
       const running = rows.length - waiting
       const [fallbackOpen, setFallbackOpen] = React.useState(false)
